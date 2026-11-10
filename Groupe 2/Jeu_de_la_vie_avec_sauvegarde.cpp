@@ -33,13 +33,9 @@ class Cell {
         {
             next = false; 
         }
-        void setPosition(int posX, int posY) 
-        { 
-            x = posX; y = posY; 
-        }
-        void getPosition(int &posX, int &posY) 
-        { 
-            posX = x; posY = y;
+        bool compareState() 
+        {
+            return state == next;
         }
         void addNeighbor(Cell* c)
         {
@@ -84,7 +80,9 @@ class Organism {
         int width;
         int aliveCount;
         int deadCount;
+        bool stable;
         Cell** grid; // 2D array of cells represented as a 1D array
+        std::list<std::pair<int, Cell**>> save; // List of grid per step for saving the state of the organism
         
         void cellsAroundExist(int i, int j)
         {
@@ -105,8 +103,8 @@ class Organism {
 
         public :
         int step;
-        Organism(std::string n, int l, int w) : name(n), length(l), width(w), grid(NULL), step(0) {};
-        ~Organism() // libère la mémoire
+        Organism(std::string n, int l, int w) : name(n), length(l), width(w), stable(false), grid(NULL), step(0) {};
+        ~Organism()
         {
             if (grid != NULL)
             {
@@ -139,36 +137,38 @@ class Organism {
         void nextstep() 
         { 
             step++; // Increment the step count
+            stable = true; // Assume the organism is stable until proven otherwise
             for (int i = 0; i < length; ++i) 
             {
                 for (int j = 0; j < width; ++j) 
                 {
-                    grid[i * width + j]->statesAround(); // calcul des nouveaux états
+                    grid[i * width + j]->statesAround(); // calcul of the new states
                 }
             }
-            for (int i = 0; i < length; ++i) // 2e passe, application simultanée
+            save.push_back(std::make_pair(step, grid));
+            for (int i = 0; i < length; ++i) // 2nd loop to apply the new states and check for stability
             {
                 for (int j = 0; j < width; ++j) 
                 {
+                    if (not grid[i * width + j]->compareState())
+                    {
+                        stable = false;
+                    }
                     grid[i * width + j]->applyNext();
                 }
             }
         } 
-        std::string getName() const 
-        { 
-            return name; 
-        }
-        int getLength() const 
-        { 
-            return length; 
-        }
-        int getWidth() const 
-        { 
-            return width; 
-        }
         int getStep() const 
         { 
             return step; 
+        }
+        Organism** getGrid(int step)  
+        { 
+            return save[step].second; 
+        }
+        bool isStable() const 
+        {
+            return stable;
         }
         void tab()
         {
@@ -178,11 +178,11 @@ class Organism {
                 {
                     if (grid[i * width + j]->isAlive())
                     {
-                        std::cout << "1 "; // Print 1 for alive cells
+                        std::cout << "🟩 "; // Print 1 for alive cells
                     } 
                     else 
                     {
-                        std::cout << "0 "; // Print 0 for dead cells
+                        std::cout << "🟥 "; // Print 0 for dead cells
                     }
                 }
                 std::cout << std::endl;
@@ -192,13 +192,15 @@ class Organism {
 
 int main() {
     std::srand(std::time(nullptr));
-    Organism o("test", 10, 10);
+    Organism o("test", 16, 16);
     o.init_organism();
     o.tab();
-    for (int i = 0; i < 5; ++i) {
+    while (!o.isStable() || o.getStep() < 100)
+    {
         o.nextstep();
         std::cout << "\nEtape " << o.getStep() << "\n";
         o.tab();
     }
+    std::cout << "L'organisme est stable, fin de la simulation." << std::endl;
     return 0;
 };

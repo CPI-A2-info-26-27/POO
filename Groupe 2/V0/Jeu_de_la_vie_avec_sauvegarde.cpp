@@ -196,6 +196,7 @@ class Organism {
         }
 };
 
+#ifndef JEU_DE_LA_VIE_SANS_MAIN
 int main() {
     std::srand(std::time(nullptr));
     Organism o("test", 20, 20);
@@ -209,4 +210,5 @@ int main() {
     }
     std::cout << "L'organisme est stable, fin de la simulation." << std::endl;
     return 0;
-};
+}
+#endif

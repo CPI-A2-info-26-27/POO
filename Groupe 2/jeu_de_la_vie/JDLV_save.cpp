@@ -1,0 +1,409 @@
+#include <iostream>
+#include <fstream>  // to read the grid from a .txt file
+#include <string>
+#include <list>
+#include <cstdlib>
+#include <ctime>
+#include <vector>
+#include <algorithm>
+#include <thread>   // std::this_thread::sleep_for (pause between two steps in the console)
+#include <chrono>
+
+// States of a cell (polymorphism)
+// Each state knows if it is alive and how it is printed:
+// the code that uses a state never needs an if / else on its type.
+class CellState {
+    public :
+        virtual ~CellState() = default;
+        virtual bool isAlive() const = 0;
+        virtual bool isStone() const
+        {
+            return false; // only StoneState says true
+        }
+        virtual std::string symbol() const = 0; // how the cell is printed in the console
+};
+
+class AliveState : public CellState {
+    public :
+        bool isAlive() const override
+        {
+            return true;
+        }
+        bool isStone() const override
+        {
+            return false;
+        }
+        std::string symbol() const override
+        {
+            return "🟩 ";
+        }
+};
+
+class DeadState : public CellState {
+    public :
+        bool isAlive() const override
+        {
+            return false;
+        }
+        bool isStone() const override
+        {
+            return false;
+        }
+        std::string symbol() const override
+        {
+            return "🟥 ";
+        }
+};
+
+class StoneState : public CellState {
+    public :
+        bool isAlive() const override
+        {
+            return false;
+        }
+        bool isStone() const override
+        {
+            return true;
+        }
+        std::string symbol() const override
+        {
+            return "⬛ ";
+        }
+};
+
+// Only one instance of each state, shared by all the cells (no "new" for each cell)
+const AliveState ALIVE_STATE;
+const DeadState DEAD_STATE;
+const StoneState STONE_STATE;
+
+// Rules (polymorphism)
+// A rule gives the next state of a cell from its current state and its number of alive neighbors.
+// To change the rules of the game, write a new subclass: Cell and Organism do not change.
+class Rules {
+    public :
+        virtual ~Rules() = default;
+        virtual const CellState* next(const CellState& current, int aliveCount) const = 0;
+};
+
+// Classic Conway rule
+class ConwayRules : public Rules {
+    public :
+        const CellState* next(const CellState& current, int aliveCount) const override
+        {
+            if (current.isAlive())
+            {
+                if (aliveCount == 2 || aliveCount == 3)
+                {
+                    return &ALIVE_STATE; // survives
+                }
+                return &DEAD_STATE; // dies
+            }
+            if (&current == &STONE_STATE) 
+            {
+                return &STONE_STATE;
+            }
+            if (aliveCount == 3)
+            {
+                return &ALIVE_STATE; // is born
+            }
+            return &DEAD_STATE; // stays dead
+            
+        }
+};
+
+class Cell {
+    private :
+        bool stone; // true if the cell is a stone, false if it is a cell
+        const CellState* state; // current state (ALIVE_STATE or DEAD_STATE)
+        const CellState* next;  // state on the next step
+        int x, y; // Position of the cell in the grid
+        std::list<Cell*> neighbors; // List of pins of the neighboring cells
+
+    public :
+        Cell(const CellState* s, int posX, int posY) : state(s), next(s), x(posX), y(posY) {}; // Constructor initializes the cell with a given state
+        bool isAlive()
+        {
+            return state->isAlive();
+        }
+        const CellState* getState()
+        {
+            return state;
+        }
+        void setAlive()
+        {
+            state = &ALIVE_STATE;
+        }
+        void setDEAD ()
+        {
+            state = &DEAD_STATE;
+        }
+        void setSTONE ()
+        {
+            state = &STONE_STATE;
+        }
+        void addNeighbor(Cell* c)
+        {
+            neighbors.push_back(c);
+        }
+        void applyNext()
+        {
+            state = next;
+        }
+        void statesAround(const Rules& rules)
+        {
+            int aliveCount = 0;
+            for (Cell* neighbor : neighbors)
+            {
+                if (neighbor->isAlive())
+                {
+                    aliveCount++;
+                }
+            }
+            next = rules.next(*state, aliveCount); // the rule decides, whatever rule it is
+        };
+};
+
+class Organism {
+    private :
+        std::string name;
+        int length;
+        int width;
+        int aliveCount;
+        int deadCount;
+        bool withstones; // true if the organism uses stones, false otherwise
+        Cell** grid; // 2D array of cells represented as a 1D array
+        const Rules& rules; // rules of the game, chosen in main
+        std::vector<std::vector<bool>> save; // List of grid for saving the states of the organism
+        
+        void cellsAroundExist(int i, int j)
+        {
+            for (int dx = -1; dx <= 1; ++dx) {
+                for (int dy = -1; dy <= 1; ++dy) {
+                    int neighborX = i + dx;
+                    int neighborY = j + dy;
+                    if (not (dx == 0 && dy == 0))
+                    {
+                        if (neighborX >= 0 && neighborX < length && neighborY >= 0 && neighborY < width) 
+                        {
+                            grid[i * width + j]->addNeighbor(grid[neighborX * width + neighborY]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Creates the cells from a list of states (one state per cell, line after line),
+        // then links the neighbors and saves step 0. Used by init_organism and init_from_file.
+        void buildGrid(const std::vector<const CellState*>& states)
+        {
+            step = 0;
+            grid = new Cell*[length * width];
+            for (int i = 0; i < length; ++i)
+            {
+                for (int j = 0; j < width; ++j)
+                {
+                    grid[i * width + j] = new Cell(states[i * width + j], i, j);
+                }
+            }
+            for (int i = 0; i < length; ++i) // liaison des voisines
+            {
+                for (int j = 0; j < width; ++j)
+                {
+                    cellsAroundExist(i, j);
+                }
+            }
+            saveGrid(); // Save the initial state of the grid
+        }
+
+        public :
+        int step;
+        // useStones: true to put stones in the grid (cells that never change)
+        Organism(std::string n, int l, int w, const Rules& r, bool useStones = false)
+            : name(n), length(l), width(w), aliveCount(0), deadCount(0), withstones(useStones), grid(NULL), rules(r), step(0) {};
+        ~Organism()
+        {
+            if (grid != NULL)
+            {
+                for (int k = 0; k < length * width; ++k)
+                {
+                    delete grid[k];
+                }
+                delete[] grid;
+            }
+        }
+        // Random grid. Call only once per Organism.
+        void init_organism()
+        {
+            std::vector<const CellState*> states;
+            for (int k = 0; k < length * width; ++k)
+            {
+                int hasard = rand() % 9; // 0 to 8
+                if (withstones && hasard == 0)
+                {
+                    states.push_back(&STONE_STATE); // about 1 cell out of 9 is a stone
+                }
+                else if (rand() % 2 == 0)
+                {
+                    states.push_back(&ALIVE_STATE);
+                }
+                else
+                {
+                    states.push_back(&DEAD_STATE);
+                }
+            }
+            buildGrid(states);
+        }
+
+        // Grid read from a .txt file. Call only once per Organism.
+        // File format:
+        //   first line : number of lines and number of columns, e.g. "10 20"
+        //   then one digit per cell: 0 = dead, 1 = alive, 2 = stone (spaces and line breaks are ignored)
+        // If stones are disabled, the "2" are read as dead cells.
+        // Returns false and fills "error" if the file is not valid.
+        bool init_from_file(const std::string& path, std::string& error)
+        {
+            std::ifstream file(path);
+            if (!file)
+            {
+                error = "Impossible d'ouvrir le fichier : " + path;
+                return false;
+            }
+            int l = 0;
+            int w = 0;
+            if (!(file >> l >> w) || l <= 0 || w <= 0)
+            {
+                error = "La première ligne doit contenir : lignes colonnes (ex : 10 20)";
+                return false;
+            }
+            std::vector<const CellState*> states;
+            char c;
+            while ((int)states.size() < l * w && file >> c) // ">>" skips spaces and line breaks
+            {
+                if (c == '0')
+                {
+                    states.push_back(&DEAD_STATE);
+                }
+                else if (c == '1')
+                {
+                    states.push_back(&ALIVE_STATE);
+                }
+                else if (c == '2')
+                {
+                    states.push_back(withstones ? (const CellState*)&STONE_STATE : &DEAD_STATE);
+                }
+                else
+                {
+                    error = std::string("Caractère inattendu dans le fichier : '") + c + "' (seuls 0, 1 et 2 sont permis)";
+                    return false;
+                }
+            }
+            if ((int)states.size() < l * w)
+            {
+                error = "Il manque des cellules : " + std::to_string(l * w) + " attendues, "
+                        + std::to_string(states.size()) + " trouvées";
+                return false;
+            }
+            length = l;
+            width = w;
+            buildGrid(states);
+            return true;
+        }
+
+        int getLength() const
+        {
+            return length;
+        }
+        int getWidth() const
+        {
+            return width;
+        }
+        void nextstep() 
+        { 
+            step++; // Increment the step count
+            for (int i = 0; i < length; ++i) 
+            {
+                for (int j = 0; j < width; ++j) 
+                {
+                    grid[i * width + j]->statesAround(rules); // calcul of the new states
+                }
+            }
+            for (int i = 0; i < length; ++i) // 2nd loop to apply the new states and check for stability
+            {
+                for (int j = 0; j < width; ++j) 
+                {
+                    grid[i * width + j]->applyNext();
+                }
+            }
+            saveGrid(); // Save the current state of the grid
+        } 
+        int getStep() const 
+        { 
+            return step; 
+        }
+        void saveGrid()
+        {
+            std::vector<bool> copie;
+            for (int k = 0; k < length * width; ++k)
+            {
+                copie.push_back(grid[k]->isAlive());
+            }
+            save.push_back(copie);
+        }
+        const std::vector<bool>& getGrid(int s) const // saved grid of step s (true = alive)
+        {
+            return save[s];
+        }
+        std::vector<bool> getStones() const // true where the cell is a stone (stones never change)
+        {
+            std::vector<bool> stones;
+            for (int k = 0; k < length * width; ++k)
+            {
+                stones.push_back(grid[k]->getState()->isStone());
+            }
+            return stones;
+        }
+        bool alreadySeen()
+        {
+            return std::find(save.begin(), save.end() - 1, save[step]) != save.end() - 1;
+        }
+        void tab()
+        {
+            for (int i = 0; i < length; ++i) 
+            {
+                for (int j = 0; j < width; ++j) 
+                {
+                    std::cout << grid[i * width + j]->getState()->symbol(); // each state knows how to print itself
+                }
+                std::cout << std::endl;
+            }
+        }
+};
+
+// Runs the simulation in the terminal until a state already seen comes back.
+// delayMs = pause between two steps (in milliseconds).
+// Used by the main below and by the graphic interface when "Console" mode is chosen.
+void runConsoleSimulation(Organism& o, int delayMs)
+{
+    const std::string CLEAR_SCREEN = "\033[2J\033[H"; // erases the terminal and goes back to the top
+    std::cout << CLEAR_SCREEN << "Etape 0\n";
+    o.tab();
+    while (o.getStep() < 2 || o.alreadySeen() == false)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+        o.nextstep();
+        std::cout << CLEAR_SCREEN << "Etape " << o.getStep() << "\n";
+        o.tab();
+    }
+    std::cout << "L'organisme est stable, fin de la simulation." << std::endl;
+}
+
+#ifndef JEU_DE_LA_VIE_SANS_MAIN
+int main() {
+    std::srand(std::time(nullptr));
+    ConwayRules conway; // to play with other rules, only this line changes
+    Organism o("test", 20, 20, conway, true); // true = with stones
+    o.init_organism();
+    runConsoleSimulation(o, 200);
+    return 0;
+}
+#endif

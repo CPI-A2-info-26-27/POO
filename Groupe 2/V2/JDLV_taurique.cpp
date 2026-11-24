@@ -1,0 +1,718 @@
+#include <iostream>
+#include <fstream>  // to read the grid from a .txt file
+#include <string>
+#include <list>
+#include <cstdlib>
+#include <ctime>
+#include <vector>
+#include <algorithm>
+#include <thread>   // std::this_thread::sleep_for (pause between two steps in the console)
+#include <chrono>
+
+// States of a cell (polymorphism)
+// Each state knows if it is alive and how it is printed:
+// the code that uses a state never needs an if / else on its type.
+
+struct motifs 
+{
+    std::list<int> round_7x7 = {0,0,1,1,1,0,0,
+                               0,1,1,1,1,1,0,
+                               1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,
+                               0,1,1,1,1,1,0,
+                               0,0,1,1,1,0,0,}; 
+
+    std::list<int> square_9x9 ={1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1}; 
+
+    std::list<int> rectangle_v5x9 ={1,1,1,1,1,
+                               1,1,1,1,1,
+                               1,1,1,1,1,
+                               1,1,1,1,1,
+                               1,1,1,1,1,
+                               1,1,1,1,1,
+                               1,1,1,1,1,
+                               1,1,1,1,1,   
+                               1,1,1,1,1,}; 
+
+    std::list<int> rectangle_h9x5 ={1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1,
+                               1,1,1,1,1,1,1,1,1}; 
+
+    std::list<int> star_9x9={0,0,0,0,1,0,0,0,0,
+                               0,0,0,1,0,1,0,0,0,
+                               0,0,1,0,1,0,1,0,0,
+                               0,1,0,1,0,1,0,1,0,
+                               1,0,1,0,1,0,1,0,1,
+                               0,1,0,1,0,1,0,1,0,
+                               0,0,1,0,1,0,1,0,0,
+                               0,0,0,1,0,1,0,0,0,
+                               0,0,0,0,1,0,0,0,0};
+
+    std::list<int> ship_tr = {0,1,1,
+                              1,0,1,
+                              0,0,1};
+
+    std::list<int> ship_tl = {1,1,0,
+                              1,0,1,
+                              1,0,0};
+
+    std::list<int> ship_br = {0,0,1,
+                              1,0,1,
+                              0,1,1};
+
+    std::list<int> ship_bl = {1,0,0,
+                              1,0,1,
+                              1,1,0};
+                              
+    std::list<int> u_3x3 = {1,0,1,
+                            1,0,1,
+                            1,1,1};
+    
+    std::list<int> star_7x5 = {0,0,1,1,1,0,0,
+                               0,1,0,0,0,1,0,
+                               1,0,0,0,0,0,1,
+                               0,1,0,0,0,1,0,
+                               0,0,1,1,1,0,0,}; 
+
+    std::list<int> infinite_1={0,0,1,1,1,0,0,0,1,1,1,0,0,
+                               0,0,0,0,0,0,0,0,0,0,0,0,0,
+                               1,0,0,0,0,1,0,1,0,0,0,0,1,
+                               1,0,0,0,0,1,0,1,0,0,0,0,1,
+                               1,0,0,0,0,1,0,1,0,0,0,0,1,
+                               0,0,1,1,1,0,0,0,1,1,1,0,0,
+                               0,0,0,0,0,0,0,0,0,0,0,0,0,
+                               0,0,1,1,1,0,0,0,1,1,1,0,0,
+                               1,0,0,0,0,1,0,1,0,0,0,0,1,
+                               1,0,0,0,0,1,0,1,0,0,0,0,1,
+                               1,0,0,0,0,1,0,1,0,0,0,0,1,
+                               0,0,0,0,0,0,0,0,0,0,0,0,0,
+                               0,0,1,1,1,0,0,0,1,1,1,0,0};
+
+     std::list<int> block_2x2 = {1,1,
+                                1,1};
+
+    std::list<int> beehive_4x3 = {0,1,1,0,
+                                  1,0,0,1,
+                                  0,1,1,0};
+
+    std::list<int> loaf_4x4 = {0,1,1,0,
+                               1,0,0,1,
+                               0,1,0,1,
+                               0,0,1,0};
+
+    std::list<int> boat_3x3 = {1,1,0,
+                               1,0,1,
+                               0,1,0};
+
+    std::list<int> tub_3x3 = {0,1,0,
+                              1,0,1,
+                              0,1,0};
+
+    std::list<int> blinker_3x1 = {1,1,1}; 
+
+    std::list<int> toad_4x2 = {0,1,1,1,
+                               1,1,1,0};
+
+    std::list<int> beacon_4x4 = {1,1,0,0,
+                                 1,1,0,0,
+                                 0,0,1,1,
+                                 0,0,1,1};
+
+    std::list<int> pentadecathlon_10x3 = {0,0,1,0,0,0,0,1,0,0,
+                                          1,1,0,1,1,1,1,0,1,1,
+                                          0,0,1,0,0,0,0,1,0,0};
+
+    std::list<int> glider_3x3 = {0,1,0,
+                                 0,0,1,
+                                 1,1,1};
+
+    std::list<int> lwss_5x4 = {0,1,0,0,1,
+                               1,0,0,0,0,
+                               1,0,0,0,1,
+                               1,1,1,1,0};
+
+    std::list<int> mwss_6x5 = {0,0,0,1,0,0,
+                               0,1,0,0,0,1,
+                               1,0,0,0,0,0,
+                               1,0,0,0,0,1,
+                               1,1,1,1,1,0};
+
+    std::list<int> hwss_7x5 = {0,0,0,1,1,0,0,
+                               0,1,0,0,0,0,1,
+                               1,0,0,0,0,0,0,
+                               1,0,0,0,0,0,1,
+                               1,1,1,1,1,1,0};
+
+    std::list<int> r_pentomino_3x3 = {0,1,1,
+                                      1,1,0,
+                                      0,1,0}; 
+
+    std::list<int> diehard_8x3 = {0,0,0,0,0,0,1,0,
+                                  1,1,0,0,0,0,0,0,
+                                  0,1,0,0,0,1,1,1}; 
+
+    std::list<int> acorn_7x3 = {0,1,0,0,0,0,0,
+                                0,0,0,1,0,0,0,
+                                1,1,0,0,1,1,1};
+
+    std::list<int> gosper_gun_36x9 = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,
+                                      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,
+                                      0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+                                      0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,
+                                      1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                                      1,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,
+                                      0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,
+                                      0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                                      0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+    std::list<int> infinite_5x5 = {1,1,1,0,1,
+                                   1,0,0,0,0,
+                                   0,0,0,1,1,
+                                   0,1,1,0,1,
+                                   1,0,1,0,1};
+
+    // Still lifes
+    std::list<int> pond_4x4 = {0,1,1,0,
+                               1,0,0,1,
+                               1,0,0,1,
+                               0,1,1,0};
+
+    std::list<int> barge_4x4 = {0,1,0,0,
+                                1,0,1,0,
+                                0,1,0,1,
+                                0,0,1,0};
+
+    std::list<int> snake_4x2 = {1,1,0,1,
+                                1,0,1,1};
+
+    // Oscillators
+    std::list<int> clock_4x4 = {0,0,1,0,
+                                1,0,1,0,
+                                0,1,0,1,
+                                0,1,0,0};
+
+    std::list<int> kok_galaxy_9x9 = {1,1,1,1,1,1,0,1,1,
+                                     1,1,1,1,1,1,0,1,1,
+                                     0,0,0,0,0,0,0,1,1,
+                                     1,1,0,0,0,0,0,1,1,
+                                     1,1,0,0,0,0,0,1,1,
+                                     1,1,0,0,0,0,0,1,1,
+                                     1,1,0,0,0,0,0,0,0,
+                                     1,1,0,1,1,1,1,1,1,
+                                     1,1,0,1,1,1,1,1,1};
+
+    // Methuselah
+    std::list<int> thunderbird_3x5 = {1,1,1,
+                                      0,0,0,
+                                      0,1,0,
+                                      0,1,0,
+                                      0,1,0};
+
+};
+
+
+class CellState {
+    public :
+        virtual ~CellState() = default;
+        virtual bool isAlive() const = 0;
+        virtual bool isStone() const
+        {
+            return false; // only StoneState says true
+        }
+
+};
+
+class AliveState : public CellState {
+    public :
+        bool isAlive() const override
+        {
+            return true;
+        }
+        bool isStone() const override
+        {
+            return false;
+        }
+};
+
+class DeadState : public CellState {
+    public :
+        bool isAlive() const override
+        {
+            return false;
+        }
+        bool isStone() const override
+        {
+            return false;
+        }
+};
+
+class StoneState : public CellState {
+    public :
+        bool isAlive() const override
+        {
+            return false;
+        }
+        bool isStone() const override
+        {
+            return true;
+        }
+};
+
+// Only one instance of each state, shared by all the cells (no "new" for each cell)
+const AliveState ALIVE_STATE;
+const DeadState DEAD_STATE;
+const StoneState STONE_STATE;
+
+// Rules (polymorphism)
+// A rule gives the next state of a cell from its current state and its number of alive neighbors.
+// To change the rules of the game, write a new subclass: Cell and Organism do not change.
+class Rules {
+    public :
+        virtual ~Rules() = default;
+        virtual const CellState* next(const CellState& current, int aliveCount) const = 0;
+};
+
+// Classic Conway rule
+class ConwayRules : public Rules {
+    public :
+        const CellState* next(const CellState& current, int aliveCount) const override
+        {
+            if (current.isAlive())
+            {
+                if (aliveCount == 2 || aliveCount == 3)
+                {
+                    return &ALIVE_STATE; // survives
+                }
+                return &DEAD_STATE; // dies
+            }
+            if (&current == &STONE_STATE) 
+            {
+                return &STONE_STATE;
+            }
+            if (aliveCount == 3)
+            {
+                return &ALIVE_STATE; // is born
+            }
+            return &DEAD_STATE; // stays dead
+            
+        }
+};
+
+class Cell {
+    private :
+        bool stone; // true if the cell is a stone, false if it is a cell
+        const CellState* state; // current state (ALIVE_STATE or DEAD_STATE)
+        const CellState* next;  // state on the next step
+        int x, y; // Position of the cell in the grid
+        std::list<Cell*> neighbors; // List of pins of the neighboring cells
+
+    public :
+        Cell(const CellState* s, int posX, int posY) : state(s), next(s), x(posX), y(posY) {}; // Constructor initializes the cell with a given state
+        bool isAlive()
+        {
+            return state->isAlive();
+        }
+        const CellState* getState()
+        {
+            return state;
+        }
+        void setAlive()
+        {
+            state = &ALIVE_STATE;
+        }
+        void setDEAD ()
+        {
+            state = &DEAD_STATE;
+        }
+        void setSTONE ()
+        {
+            state = &STONE_STATE;
+        }
+        void addNeighbor(Cell* c)
+        {
+            neighbors.push_back(c);
+        }
+        void applyNext()
+        {
+            state = next;
+        }
+        void statesAround(const Rules& rules)
+        {
+            int aliveCount = 0;
+            for (Cell* neighbor : neighbors)
+            {
+                if (neighbor->isAlive())
+                {
+                    aliveCount++;
+                }
+            }
+            next = rules.next(*state, aliveCount); // the rule decides, whatever rule it is
+        };
+};
+
+class Organism {
+    private :
+        std::string name;
+        int length;
+        int width;
+        int aliveCount;
+        int deadCount;
+        bool withstones; // true if the organism uses stones, false otherwise
+        bool tauric; // true if the organism is tauric, false otherwise
+        bool fromFile; // true if the organism is created from a file, false otherwise
+        bool saving;   // true if every step is written in filepathout (see setOutputFile)
+        std::string filepath;
+        std::string filepathout;
+        Cell** grid; // 2D array of cells represented as a 1D array
+        const Rules& rules; // rules of the game, chosen in main
+        std::vector<std::vector<bool>> save; // List of grid for saving the states of the organism
+        
+        void cellsAroundExist(int i, int j)
+        {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    int neighborX = i + dx;
+                    int neighborY = j + dy;
+                    if (not (dx == 0 && dy == 0))
+                    {
+                        if (neighborX >= 0 && neighborX < length && neighborY >= 0 && neighborY < width) 
+                        {
+                            grid[i * width + j]->addNeighbor(grid[neighborX * width + neighborY]);
+                        }
+                    }
+                }
+            }
+        }
+
+        void defineCellsAround(int i, int j)
+        {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    if (not (dx == 0 && dy == 0))
+                    {
+                        int x = (i + dx + length) % length;
+                        int y = (j + dy + width) % width;
+                        grid[i * width + j]->addNeighbor(grid[x * width + y]);
+                    }
+                }
+            }
+        }
+
+        // Creates the cells from a list of states (one state per cell, line after line),
+        // then links the neighbors and saves step 0. Used by init_organism and init_from_file.
+        void buildGrid(const std::vector<const CellState*>& states)
+        {
+            step = 0;
+            grid = new Cell*[length * width];
+            for (int i = 0; i < length; i++)
+            {
+                for (int j = 0; j < width; j++)
+                {
+                    grid[i * width + j] = new Cell(states[i * width + j], i, j);
+                }
+            }
+            for (int i = 0; i < length; i++) // liaison des voisines
+            {
+                for (int j = 0; j < width; j++)
+                {
+                    if (tauric)
+                    {
+                        defineCellsAround(i, j);
+                    }
+                    else
+                    {
+                        cellsAroundExist(i, j);
+                    }
+                }
+            }
+            saveGrid(); // Save the initial state of the grid
+            if (saving)
+            {
+                createSaveFile();
+                resultSave(); // writes step 0 (useful for a random grid: we keep the starting grid)
+            }
+        }
+
+        public :
+        int step;
+        // useStones: true to put stones in the grid (cells that never change)
+        Organism(std::string n, int l, int w, const Rules& r, bool useStones = false)
+            : name(n), length(l), width(w), aliveCount(0), deadCount(0), withstones(useStones), tauric(false),
+              fromFile(false), saving(false), grid(NULL), rules(r), step(0) {};
+
+        // Call BEFORE init_organism / init_from_file.
+        // true = the edges are linked (a cell on the right border touches the left border, same for top / bottom)
+        void setTauric(bool t)
+        {
+            tauric = t;
+        }
+
+        // Call BEFORE init_organism / init_from_file.
+        // Every step will be written in this file. Empty path = nothing is saved.
+        void setOutputFile(const std::string& path)
+        {
+            filepathout = path;
+            saving = !path.empty();
+        }
+        ~Organism()
+        {
+            if (grid != NULL)
+            {
+                for (int k = 0; k < length * width; k++)
+                {
+                    delete grid[k];
+                }
+                delete[] grid;
+            }
+        }
+        // Random grid. Call only once per Organism.
+        void init_organism()
+        {
+            std::vector<const CellState*> states;
+            for (int k = 0; k < length * width; k++)
+            {
+                int hasard = rand() % 9; // 0 to 8
+                if (withstones && hasard == 0)
+                {
+                    states.push_back(&STONE_STATE); // about 1 cell out of 9 is a stone
+                }
+                else if (rand() % 2 == 0)
+                {
+                    states.push_back(&ALIVE_STATE);
+                }
+                else
+                {
+                    states.push_back(&DEAD_STATE);
+                }
+            }
+            buildGrid(states);
+        }
+
+        // Grid read from a .txt file. Call only once per Organism.
+        // File format:
+        //   first line : number of lines and number of columns, e.g. "10 20"
+        //   then one digit per cell: 0 = dead, 1 = alive, 2 = stone (spaces and line breaks are ignored)
+        // If stones are disabled, the "2" are read as dead cells.
+        // Returns false and fills "error" if the file is not valid.
+        bool init_from_file(const std::string& path, std::string& error)
+        {
+            fromFile = true;
+            Organism::filepath = path;
+            std::ifstream file(path);
+            if (!file)
+            {
+                error = "Impossible d'ouvrir le fichier : " + path;
+                return false;
+            }
+            int l = 0;
+            int w = 0;
+            if (!(file >> l >> w) || l <= 0 || w <= 0)
+            {
+                error = "La première ligne doit contenir : lignes colonnes (ex : 10 20)";
+                return false;
+            }
+            std::vector<const CellState*> states;
+            char c;
+            while ((int)states.size() < l * w && file >> c) // ">>" skips spaces and line breaks
+            {
+                if (c == '0')
+                {
+                    states.push_back(&DEAD_STATE);
+                }
+                else if (c == '1')
+                {
+                    states.push_back(&ALIVE_STATE);
+                }
+                else if (c == '2')
+                {
+                    states.push_back(withstones ? (const CellState*)&STONE_STATE : &DEAD_STATE);
+                }
+                else
+                {
+                    error = std::string("Caractère inattendu dans le fichier : '") + c + "' (seuls 0, 1 et 2 sont permis)";
+                    return false;
+                }
+            }
+            if ((int)states.size() < l * w)
+            {
+                error = "Il manque des cellules : " + std::to_string(l * w) + " attendues, "
+                        + std::to_string(states.size()) + " trouvées";
+                return false;
+            }
+            length = l;
+            width = w;
+            buildGrid(states);
+            return true;
+        }
+
+        // Grid drawn by the user in the graphic interface. Call only once per Organism.
+        // One value per cell, line after line: 0 = dead, 1 = alive, 2 = stone.
+        // If stones are disabled, the "2" are read as dead cells.
+        void init_from_cells(const std::vector<int>& cells)
+        {
+            std::vector<const CellState*> states;
+            for (int k = 0; k < length * width; k++)
+            {
+                int v = k < (int)cells.size() ? cells[k] : 0;
+                if (v == 1)
+                {
+                    states.push_back(&ALIVE_STATE);
+                }
+                else if (v == 2 && withstones)
+                {
+                    states.push_back(&STONE_STATE);
+                }
+                else
+                {
+                    states.push_back(&DEAD_STATE);
+                }
+            }
+            buildGrid(states);
+        }
+
+        bool createSaveFile()
+        {
+            std::ofstream fichier(filepathout);
+            if (!fichier)
+            {
+                std::cerr << "Impossible d'ouvrir le fichier de sortie." << std::endl;
+                return false;
+            }
+            fichier << length << " x " << width << std::endl;
+            return true;
+        }
+        bool resultSave()
+        {   
+            std::ofstream fichier(filepathout, std::ios::app);
+            if (!fichier)
+            {
+                return false;
+            }
+            fichier << "Etape " << step << std::endl;
+            for (int i = 0; i < length; i++)
+            {
+                for (int j = 0; j < width; j++)
+                {
+                    const CellState* state = grid[i * width + j]->getState();
+                    if (state == &DEAD_STATE)
+                    {
+                        fichier << "0 ";
+                    }
+                    else if (state == &ALIVE_STATE)
+                    {
+                        fichier << "1 ";
+                    }
+                    else if (state == &STONE_STATE)
+                    {
+                        fichier << "2 ";
+                    }
+                }
+                fichier << '\n';
+            }
+            fichier << '\n';
+            return true;
+        }
+    
+        int getLength() const
+        {
+            return length;
+        }
+        int getWidth() const
+        {
+            return width;
+        }
+        void nextstep() 
+        { 
+            step++; // Increment the step count
+            for (int i = 0; i < length; i++) 
+            {
+                for (int j = 0; j < width; j++) 
+                {
+                    grid[i * width + j]->statesAround(rules); // calcul of the new states
+                }
+            }
+            for (int i = 0; i < length; i++) // 2nd loop to apply the new states and check for stability
+            {
+                for (int j = 0; j < width; j++) 
+                {
+                    grid[i * width + j]->applyNext();
+                }
+            }
+            saveGrid(); // Save the current state of the grid
+            if (saving)
+            {
+                resultSave();
+            }
+        } 
+        int getStep() const 
+        { 
+            return step; 
+        }
+        void saveGrid()
+        {
+            std::vector<bool> copie;
+            for (int k = 0; k < length * width; k++)
+            {
+                copie.push_back(grid[k]->isAlive());
+            }
+            save.push_back(copie);
+        }
+        const std::vector<bool>& getGrid(int s) const // saved grid of step s (true = alive)
+        {
+            return save[s];
+        }
+        std::vector<bool> getStones() const // true where the cell is a stone (stones never change)
+        {
+            std::vector<bool> stones;
+            for (int k = 0; k < length * width; k++)
+            {
+                stones.push_back(grid[k]->getState()->isStone());
+            }
+            return stones;
+        }
+        bool alreadySeen()
+        {
+            if (save.size()< 1000)
+            {
+                return std::find(save.begin(), save.end() - 1, save[step]) != save.end() - 1;
+            }
+            return std::find(save.end() - 1000, save.end() - 1, save[step]) != save.end() - 1;;
+        }
+};
+
+// Runs the simulation in the terminal until a state already seen comes back,
+// or until maxSteps steps have been done.
+// delayMs  = pause between two steps (in milliseconds), 0 = no pause at all.
+// maxSteps = maximum number of steps, 0 = no limit (runs until the organism is stable).
+// Used by the main below and by the graphic interface when "Console" mode is chosen (without pause).
+void runConsoleSimulation(Organism& o, int delayMs = 0, int maxSteps = 0)
+{
+    const std::string CLEAR_SCREEN = "\033[2J\033[H"; // erases the terminal and goes back to the top
+    std::cout << CLEAR_SCREEN << "Etape 0\n";
+    while (o.getStep() < 2 || o.alreadySeen() == false)
+    {
+        if (maxSteps > 0 && o.getStep() >= maxSteps)
+        {
+            std::cout << "Limite de " << maxSteps << " étapes atteinte, fin de la simulation." << std::endl;
+            return;
+        }
+        if (delayMs > 0)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+        }
+        o.nextstep();
+        std::cout << CLEAR_SCREEN << "Etape " << o.getStep() << "\n";
+    }
+    std::cout << "L'organisme est stable, fin de la simulation." << std::endl;
+}

@@ -246,9 +246,9 @@ faire*, sans dire comment. Les trois **classes filles** donnent les réponses :
 
 | Classe | `isAlive()` | `isStone()` | `symbol()` (affichage console) |
 |---|---|---|---|
-| `AliveState` | `true` | `false` | 🟩 |
-| `DeadState` | `false` | `false` | 🟥 |
-| `StoneState` | `false` | `true` | ⬛ |
+| `AliveState` | `true` | `false` |
+| `DeadState` | `false` | `false` |
+| `StoneState` | `false` | `true` |
 
 > 💡 **C++ : héritage.** `class AliveState : public CellState` veut dire
 > « `AliveState` *est un* `CellState` ». Elle hérite de tout ce que `CellState`

@@ -781,6 +781,30 @@ class DrawPage : public Page {
             addShape("Vaisseau BG", 3, 3, m.ship_bl);
             addShape("U 3x3", 3, 3, m.u_3x3);
             addShape("Infini 13x13", 13, 13, m.infinite_1);
+            addShape("Infini 5x5", 5, 5, m.infinite_5x5);
+            addShape("Bloc", 2, 2, m.block_2x2);
+            addShape("Ruche", 4, 3, m.beehive_4x3);
+            addShape("Pain", 4, 4, m.loaf_4x4);
+            addShape("Bateau", 3, 3, m.boat_3x3);
+            addShape("Baignoire", 3, 3, m.tub_3x3);
+            addShape("Clignotant", 3, 1, m.blinker_3x1);
+            addShape("Crapaud", 4, 2, m.toad_4x2);
+            addShape("Phare", 4, 4, m.beacon_4x4);
+            addShape("Pentadécathlon", 10, 3, m.pentadecathlon_10x3);
+            addShape("Planeur", 3, 3, m.glider_3x3);
+            addShape("LWSS", 5, 4, m.lwss_5x4);
+            addShape("MWSS", 6, 5, m.mwss_6x5);
+            addShape("HWSS", 7, 5, m.hwss_7x5);
+            addShape("R-pentomino", 3, 3, m.r_pentomino_3x3);
+            addShape("Diehard", 8, 3, m.diehard_8x3);
+            addShape("Gland", 7, 3, m.acorn_7x3);
+            addShape("Canon Gosper", 36, 9, m.gosper_gun_36x9);
+            addShape("Mare", 4, 4, m.pond_4x4);
+            addShape("Barge", 4, 4, m.barge_4x4);
+            addShape("Serpent", 4, 2, m.snake_4x2);
+            addShape("Horloge", 4, 4, m.clock_4x4);
+            addShape("Galaxie de Kok", 9, 9, m.kok_galaxy_9x9);
+            addShape("Oiseau-tonnerre", 3, 5, m.thunderbird_3x5);
 
             toolButtons.reserve(tools.size()); // no reallocation: the buttons keep their address
             for (int t = 0; t < (int)tools.size(); t++)
@@ -791,17 +815,31 @@ class DrawPage : public Page {
 
         void layout(float width, float height) override
         {
-            const float BTN_W = 165.f, BTN_H = 44.f, GAP = 10.f;
-            float panelW = 2 * BTN_W + GAP;
+            // Tool buttons: as many rows as fit above the bottom buttons, then as many columns as needed.
+            // If that needs more than MAX_COLS columns, the buttons get shorter so that everything fits.
+            const float BTN_W = 200.f, GAP = 12.f, TOP = 115.f;
+            const int MAX_COLS = 4;
+            float btnH = 60.f;
+            int n = (int)toolButtons.size();
+            float available = height - 110.f - TOP; // space between the panel title and the bottom buttons
+            int rows = std::max(1, (int)((available + GAP) / (btnH + GAP)));
+            int cols = (n + rows - 1) / rows;
+            if (cols > MAX_COLS)
+            {
+                cols = MAX_COLS;
+                rows = (n + cols - 1) / cols;
+                btnH = std::max(30.f, (available + GAP) / rows - GAP);
+            }
+            float panelW = cols * BTN_W + (cols - 1) * GAP;
             float panelX = width - 40.f - panelW;
             gridArea = {40.f, 80.f, panelX - 40.f - 40.f, height - 190.f};
             centerX = gridArea.left + gridArea.width / 2;
             panelTitle = {panelX, 80.f};
-            for (int t = 0; t < (int)toolButtons.size(); t++)
+            for (int t = 0; t < n; t++) // filled column by column
             {
-                float x = panelX + (t % 2) * (BTN_W + GAP);
-                float y = 115.f + (t / 2) * (BTN_H + GAP);
-                toolButtons[t].setBox({x, y, BTN_W, BTN_H});
+                float x = panelX + (t / rows) * (BTN_W + GAP);
+                float y = TOP + (t % rows) * (btnH + GAP);
+                toolButtons[t].setBox({x, y, BTN_W, btnH});
             }
             float y = height - 86;
             back.setBox({40, y, 160, 56});

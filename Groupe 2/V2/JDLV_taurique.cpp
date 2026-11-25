@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <thread>   // std::this_thread::sleep_for (pause between two steps in the console)
 #include <chrono>
+#include <filesystem> // create the output folder <input>_out
 
 // States of a cell (polymorphism)
 // Each state knows if it is alive and how it is printed:
@@ -21,7 +22,7 @@ struct motifs
                                1,1,1,1,1,1,1,
                                1,1,1,1,1,1,1,
                                0,1,1,1,1,1,0,
-                               0,0,1,1,1,0,0,}; 
+                               0,0,1,1,1,0,0}; 
 
     std::list<int> square_9x9 ={1,1,1,1,1,1,1,1,1,
                                1,1,1,1,1,1,1,1,1,
@@ -41,7 +42,7 @@ struct motifs
                                1,1,1,1,1,
                                1,1,1,1,1,
                                1,1,1,1,1,   
-                               1,1,1,1,1,}; 
+                               1,1,1,1,1}; 
 
     std::list<int> rectangle_h9x5 ={1,1,1,1,1,1,1,1,1,
                                1,1,1,1,1,1,1,1,1,
@@ -83,7 +84,7 @@ struct motifs
                                0,1,0,0,0,1,0,
                                1,0,0,0,0,0,1,
                                0,1,0,0,0,1,0,
-                               0,0,1,1,1,0,0,}; 
+                               0,0,1,1,1,0,0}; 
 
     std::list<int> infinite_1={0,0,1,1,1,0,0,0,1,1,1,0,0,
                                0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -614,9 +615,9 @@ class Organism {
         bool withstones; // true if the organism uses stones, false otherwise
         bool tauric; // true if the organism is tauric, false otherwise
         bool fromFile; // true if the organism is created from a file, false otherwise
-        bool saving;   // true if every step is written in filepathout (see setOutputFile)
+        bool saving;   // true if every step is written in the folder dirout (see setOutputDir)
         std::string filepath;
-        std::string filepathout;
+        std::string dirout; // folder <input>_out: one file per step, same format as the input file
         Cell** grid; // 2D array of cells represented as a 1D array
         const Rules& rules; // rules of the game, chosen in main
         std::vector<std::vector<bool>> save; // List of grid for saving the states of the organism
@@ -682,7 +683,7 @@ class Organism {
             saveGrid(); // Save the initial state of the grid
             if (saving)
             {
-                createSaveFile();
+                createSaveDir();
                 resultSave(); // writes step 0 (useful for a random grid: we keep the starting grid)
             }
         }
@@ -702,10 +703,10 @@ class Organism {
         }
 
         // Call BEFORE init_organism / init_from_file.
-        // Every step will be written in this file. Empty path = nothing is saved.
-        void setOutputFile(const std::string& path)
+        // Every step will be written in this folder (one file per step). Empty path = nothing is saved.
+        void setOutputDir(const std::string& path)
         {
-            filepathout = path;
+            dirout = path;
             saving = !path.empty();
         }
         ~Organism()
@@ -824,46 +825,54 @@ class Organism {
             buildGrid(states);
         }
 
-        bool createSaveFile()
+        // Creates the output folder (and its parents if needed).
+        bool createSaveDir()
         {
-            std::ofstream fichier(filepathout);
-            if (!fichier)
+            std::error_code ec;
+            std::filesystem::create_directories(dirout, ec);
+            if (ec)
             {
-                std::cerr << "Impossible d'ouvrir le fichier de sortie." << std::endl;
+                std::cerr << "Impossible de créer le dossier de sortie : " << dirout << std::endl;
+                saving = false;
                 return false;
             }
-            fichier << length << " x " << width << std::endl;
             return true;
         }
+
+        // Writes the current step in <dirout>/etape_<step>.txt, in the same format as the input file:
+        // first line "lines columns", then one digit per cell (0 = dead, 1 = alive, 2 = stone).
         bool resultSave()
-        {   
-            std::ofstream fichier(filepathout, std::ios::app);
+        {
+            std::ofstream fichier(dirout + "/etape_" + std::to_string(step) + ".txt");
             if (!fichier)
             {
                 return false;
             }
-            fichier << "Etape " << step << std::endl;
+            fichier << length << " " << width << '\n';
             for (int i = 0; i < length; i++)
             {
                 for (int j = 0; j < width; j++)
                 {
                     const CellState* state = grid[i * width + j]->getState();
-                    if (state == &DEAD_STATE)
+                    if (j > 0)
                     {
-                        fichier << "0 ";
+                        fichier << ' ';
                     }
-                    else if (state == &ALIVE_STATE)
+                    if (state == &ALIVE_STATE)
                     {
-                        fichier << "1 ";
+                        fichier << '1';
                     }
                     else if (state == &STONE_STATE)
                     {
-                        fichier << "2 ";
+                        fichier << '2';
+                    }
+                    else
+                    {
+                        fichier << '0';
                     }
                 }
                 fichier << '\n';
             }
-            fichier << '\n';
             return true;
         }
     

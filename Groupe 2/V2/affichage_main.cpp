@@ -32,9 +32,9 @@
 #include <string>
 #include <vector>
 
-// =====================================================================
-// 1. Theme + drawing helpers
-// =====================================================================
+
+// Theme + drawing helpers
+
 
 // Dark theme: dark blue-grey background, indigo for the selected elements,
 // green for living cells and amber for stones.
@@ -149,9 +149,9 @@ void drawCells(sf::RenderWindow& window, const GridView& g, bool tauric, const s
     }
 }
 
-// =====================================================================
-// 2. Widgets
-// =====================================================================
+
+// Widgets
+
 
 // A clickable rectangle with a label.
 // What it does when clicked is given in the constructor (onClick),
@@ -322,9 +322,9 @@ class NumberBox : public InputBox {
         int maxDigits;
 };
 
-// =====================================================================
-// 3. Settings
-// =====================================================================
+
+// Settings
+
 
 // Every choice of the user. The pages read and write it, the widgets edit it.
 struct Settings {
@@ -332,7 +332,7 @@ struct Settings {
     bool fromFile = false;                   // false = random grid
     bool drawGrid = false;                   // true = the user draws the grid himself (DrawPage)
     std::string inputPath = "exemple.txt";   // grid to read (only if fromFile)
-    std::string outputPath = "resultat.txt"; // console + random grid only: every step is written here
+    std::string outputPath = "resultat_out"; // console + random grid only: folder where every step is written
     int length = 50;                         // number of lines
     int width = 50;                          // number of columns
     bool tauric = false;                     // true = the edges are linked
@@ -341,23 +341,30 @@ struct Settings {
     int maxSteps = 100;
     int delayMs = 50;                       // pause between two steps (graphic mode only)
 
-    // Where the steps are saved: never in graphic mode.
-    // Console + random grid: the path chosen by the user. Console + file: "<file>_out.txt".
+    // Folder where the steps are saved (one file per step): never in graphic mode.
+    // Console + random grid: the folder chosen by the user. Console + file: "<file name without .txt>_out",
+    // next to the input file (e.g. Exemple1.txt -> Exemple1_out/).
     std::string savePath() const
     {
         if (graphicMode)
         {
             return "";
         }
-        return fromFile ? inputPath + "_out.txt" : outputPath;
+        return fromFile ? outputDirFor(inputPath) : outputPath;
+    }
+
+    static std::string outputDirFor(const std::string& input)
+    {
+        std::filesystem::path p(input);
+        return (p.parent_path() / (p.stem().string() + "_out")).string();
     }
 };
 
 enum class PageId { Mode, Settings, Draw, Simulation };
 
-// =====================================================================
-// 4. Page (abstract)
-// =====================================================================
+
+// Page (abstract)
+
 
 class App; // defined below; the pages only keep a reference to it
 
@@ -375,9 +382,9 @@ class Page {
         App& app;
 };
 
-// =====================================================================
-// 5. App
-// =====================================================================
+
+// App
+
 
 class App {
     public :
@@ -405,6 +412,26 @@ class App {
         {
             consoleRequested = true;
             window.close();
+        }
+
+        // Program launched with a file in parameter: the simulation starts at once (no menu).
+        // Returns false and fills "error" if the file is not valid.
+        bool startFromFile(const std::string& path, bool tauric, std::string& error)
+        {
+            settings.graphicMode = true;
+            settings.fromFile = true;
+            settings.inputPath = path;
+            settings.tauric = tauric;
+            settings.stones = true; // a "2" written in the file is a stone
+            organism = std::make_unique<Organism>("gui", settings.length, settings.width, rules, settings.stones);
+            organism->setTauric(tauric);
+            if (!organism->init_from_file(path, error))
+            {
+                organism.reset();
+                return false;
+            }
+            goTo(PageId::Simulation);
+            return true;
         }
 
         // Shared state, used by the pages.
@@ -436,9 +463,9 @@ namespace Layout {
     const float BOTTOM_H = 64.f;  // height of the big buttons at the bottom
 }
 
-// ---------------------------------------------------------------------
+
 // Page 1: choose Console or Graphique
-// ---------------------------------------------------------------------
+
 class ModePage : public Page {
     public :
         explicit ModePage(App& a)
@@ -480,11 +507,11 @@ class ModePage : public Page {
         Button graphic;
 };
 
-// ---------------------------------------------------------------------
+
 // Page 2: settings
 // Some lines are shown only in some cases (e.g. the output file: console + random grid only),
 // so layout() stacks only the visible lines, one under the other.
-// ---------------------------------------------------------------------
+
 class SettingsPage : public Page {
     public :
         explicit SettingsPage(App& a)
@@ -496,7 +523,7 @@ class SettingsPage : public Page {
               lengthBox("Lignes", a.settings.length),
               widthBox("Colonnes", a.settings.width),
               inputBox("Fichier de la grille", a.settings.inputPath),
-              outputBox("Fichier de sauvegarde des étapes (vide = pas de sauvegarde)", a.settings.outputPath),
+              outputBox("Dossier de sauvegarde des étapes (vide = pas de sauvegarde)", a.settings.outputPath),
               closedButton("Bords fermés", [this] { app.settings.tauric = false; }, [this] { return !app.settings.tauric; }),
               tauricButton("Torique", [this] { app.settings.tauric = true; }, [this] { return app.settings.tauric; }),
               stonesYes("Avec pierres", [this] { app.settings.stones = true; }, [this] { return app.settings.stones; }),
@@ -692,7 +719,7 @@ class SettingsPage : public Page {
 
             app.organism = std::make_unique<Organism>("gui", s.length, s.width, app.rules, s.stones);
             app.organism->setTauric(s.tauric);         // must be set BEFORE the grid is built
-            app.organism->setOutputFile(s.savePath()); // same ("" in graphic mode = no save)
+            app.organism->setOutputDir(s.savePath()); // same ("" in graphic mode = no save)
             if (s.fromFile)
             {
                 std::string message;
@@ -747,12 +774,11 @@ class SettingsPage : public Page {
         std::string error; // shown in red when the settings are not valid
 };
 
-// ---------------------------------------------------------------------
-// Page 2b: the user draws the starting grid ("Dessiner" in the settings)
+// Draw page : the user draws the starting grid ("Dessiner" in the settings)
 // On the right: one button per tool (single cell, eraser, stone, and the shapes of "motifs").
 // Click a tool, then click on the grid: the shape is placed centered on the clicked cell.
 // Single-cell tools can also be dragged to paint. Right click = erase a cell.
-// ---------------------------------------------------------------------
+
 class DrawPage : public Page {
     public :
         explicit DrawPage(App& a)
@@ -1002,7 +1028,7 @@ class DrawPage : public Page {
             const Settings& s = app.settings;
             app.organism = std::make_unique<Organism>("gui", s.length, s.width, app.rules, s.stones);
             app.organism->setTauric(s.tauric);
-            app.organism->setOutputFile(s.savePath());
+            app.organism->setOutputDir(s.savePath());
             app.organism->init_from_cells(cells);
             if (s.graphicMode)
             {
@@ -1029,9 +1055,8 @@ class DrawPage : public Page {
         Button start;
 };
 
-// ---------------------------------------------------------------------
-// Page 3: the simulation (graphic mode only)
-// ---------------------------------------------------------------------
+// the simulation (graphic mode only)
+
 class SimulationPage : public Page {
     public :
         explicit SimulationPage(App& a)
@@ -1172,9 +1197,7 @@ class SimulationPage : public Page {
         Button next;
 };
 
-// ---------------------------------------------------------------------
 // App methods that need the pages
-// ---------------------------------------------------------------------
 
 void App::createWindow()
 {
@@ -1279,19 +1302,106 @@ void App::run()
     }
 }
 
-// =====================================================================
-// 6. main
-// =====================================================================
+// main
 
-int main()
+const char* USAGE =
+    "Utilisation :\n"
+    "  ./jeu_de_la_vie_gui                                   menu graphique (tous les réglages)\n"
+    "  ./jeu_de_la_vie_gui <fichier> [--torique] [--delai ms]\n"
+    "                                                        mode graphique : la simulation démarre tout de suite\n"
+    "  ./jeu_de_la_vie_gui <fichier> --console <n> [--torique]\n"
+    "                                                        mode console : n itérations écrites dans <fichier>_out/\n";
+
+// Reads a positive integer argument; returns false if it is not one.
+bool readNumber(const std::string& text, int& value)
+{
+    if (text.empty() || text.find_first_not_of("0123456789") != std::string::npos || text.size() > 9)
+    {
+        return false;
+    }
+    value = std::stoi(text);
+    return true;
+}
+
+int main(int argc, char* argv[])
 {
     std::srand(std::time(nullptr));
+    std::vector<std::string> args(argv + 1, argv + argc);
+
+    // ---- File given in parameter: console or graphic mode, no menu ----
+    std::string inputFile;
+    bool tauric = false;
+    bool console = false;
+    int consoleSteps = 0;
+    int delayMs = -1;
+    for (size_t k = 0; k < args.size(); k++)
+    {
+        if (args[k] == "--torique")
+        {
+            tauric = true;
+        }
+        else if (args[k] == "--console" && k + 1 < args.size() && readNumber(args[k + 1], consoleSteps) && consoleSteps > 0)
+        {
+            console = true;
+            k++;
+        }
+        else if (args[k] == "--delai" && k + 1 < args.size() && readNumber(args[k + 1], delayMs))
+        {
+            k++;
+        }
+        else if (inputFile.empty() && args[k].rfind("--", 0) != 0)
+        {
+            inputFile = args[k];
+        }
+        else
+        {
+            std::cerr << "Argument non reconnu : " << args[k] << "\n" << USAGE;
+            return 2;
+        }
+    }
+    if (inputFile.empty() && (console || tauric || delayMs >= 0))
+    {
+        std::cerr << "Il manque le fichier de la grille.\n" << USAGE;
+        return 2;
+    }
+
+    if (console)
+    {
+        // The n first iterations are written in <file>_out/, one file per iteration.
+        ConwayRules rules;
+        Organism organism("console", 0, 0, rules, true);
+        organism.setTauric(tauric);
+        std::string outDir = Settings::outputDirFor(inputFile);
+        organism.setOutputDir(outDir);
+        std::string error;
+        if (!organism.init_from_file(inputFile, error))
+        {
+            std::cerr << error << std::endl;
+            return 1;
+        }
+        runConsoleSimulation(organism, 0, consoleSteps);
+        std::cout << "Toutes les étapes sont dans le dossier : " << outDir << std::endl;
+        return 0;
+    }
 
     App app;
     if (!app.loadFont())
     {
         std::cerr << "Aucune police trouvée." << std::endl;
         return 1;
+    }
+    if (delayMs >= 0)
+    {
+        app.settings.delayMs = delayMs;
+    }
+    if (!inputFile.empty())
+    {
+        std::string error;
+        if (!app.startFromFile(inputFile, tauric, error))
+        {
+            std::cerr << error << std::endl;
+            return 1;
+        }
     }
     app.run();
 
@@ -1302,7 +1412,7 @@ int main()
         runConsoleSimulation(*app.organism, 0, maxSteps);
         if (!app.settings.savePath().empty())
         {
-            std::cout << "Toutes les étapes sont dans : " << app.settings.savePath() << std::endl;
+            std::cout << "Toutes les étapes sont dans le dossier : " << app.settings.savePath() << std::endl;
         }
     }
     return 0;

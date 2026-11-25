@@ -783,10 +783,10 @@ class DrawPage : public Page {
             addShape("Infini 13x13", 13, 13, m.infinite_1);
             addShape("Infini 5x5", 5, 5, m.infinite_5x5);
             addShape("Bloc", 2, 2, m.block_2x2);
-            addShape("Ruche", 4, 3, m.beehive_4x3);
-            addShape("Pain", 4, 4, m.loaf_4x4);
-            addShape("Bateau", 3, 3, m.boat_3x3);
-            addShape("Baignoire", 3, 3, m.tub_3x3);
+            addShape("Colonne 32x156", 32, 156, m.tall_32x156);
+            addShape("Couronne 47x47", 47, 47, m.ring_47x47);
+            addShape("Vaisseau 2c/5", 11, 19, m.ship_2c5_11x19);
+            addShape("Moulinet 27x27", 27, 27, m.pinwheel_27x27);
             addShape("Clignotant", 3, 1, m.blinker_3x1);
             addShape("Crapaud", 4, 2, m.toad_4x2);
             addShape("Phare", 4, 4, m.beacon_4x4);
@@ -801,7 +801,7 @@ class DrawPage : public Page {
             addShape("Canon Gosper", 36, 9, m.gosper_gun_36x9);
             addShape("Mare", 4, 4, m.pond_4x4);
             addShape("Barge", 4, 4, m.barge_4x4);
-            addShape("Serpent", 4, 2, m.snake_4x2);
+            addShape("Vaisseau c/4", 13, 12, m.ship_c4_13x12);
             addShape("Horloge", 4, 4, m.clock_4x4);
             addShape("Galaxie de Kok", 9, 9, m.kok_galaxy_9x9);
             addShape("Oiseau-tonnerre", 3, 5, m.thunderbird_3x5);

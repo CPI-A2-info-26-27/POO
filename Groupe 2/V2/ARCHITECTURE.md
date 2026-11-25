@@ -62,9 +62,9 @@ Groupe 2/
 └── V2/                      ← VERSION ACTUELLE
     ├── JDLV_taurique.cpp    ← la logique du jeu (cellules, règles, grille)
     ├── affichage_main.cpp   ← l'interface graphique + la fonction main()
+    ├── tests_unitaires.cpp  ← les tests unitaires : programme séparé (vérifie la grille après n itérations)
     ├── exemple.txt          ← exemple de grille de départ à charger
-    ├── resultat.txt         ← exemple de fichier de sauvegarde produit par le programme
-    ├── lahister.txt         ← autre fichier de sauvegarde produit par le programme
+    ├── Exemple1.txt … Exemple10.txt ← autres grilles de départ
     ├── jeu_de_la_vie_gui    ← programme compilé (exécutable)
     └── jdlv_simple          ← ancien exécutable compilé
 ```
@@ -116,7 +116,18 @@ Détail de la commande :
 Lancer :
 
 ```bash
-./jeu_de_la_vie_gui
+./jeu_de_la_vie_gui                              # menu graphique (tous les réglages)
+./jeu_de_la_vie_gui Exemple1.txt                 # mode graphique : la simulation démarre tout de suite
+./jeu_de_la_vie_gui Exemple1.txt --delai 200     # idem, 200 ms entre deux itérations
+./jeu_de_la_vie_gui Exemple1.txt --console 50    # mode console : 50 itérations écrites dans Exemple1_out/
+./jeu_de_la_vie_gui Exemple1.txt --torique       # option : grille torique (avec les deux modes)
+```
+
+Les tests unitaires forment un **programme séparé** (voir la partie 5.8) :
+
+```bash
+g++ -std=c++17 -Wall tests_unitaires.cpp -o tests_unitaires
+./tests_unitaires
 ```
 
 On ne compile qu'**un seul** fichier car `affichage_main.cpp` commence par
@@ -490,12 +501,13 @@ void nextstep() {
 > « on a trouvé quelque chose avant la dernière case (qui est la grille actuelle
 > elle-même) ».
 
-#### Écrire dans un fichier : `createSaveFile()` et `resultSave()`
+#### Écrire les étapes : `createSaveDir()` et `resultSave()`
 
-- `createSaveFile()` crée (ou vide) le fichier de sortie et écrit sa taille,
-  ex. `50 x 50`.
-- `resultSave()` ajoute à la fin du fichier `Etape N` suivi de la grille
-  (0 / 1 / 2). Voir `resultat.txt` pour un exemple.
+- `createSaveDir()` crée le dossier de sortie (ex. `Exemple1_out/`).
+- `resultSave()` écrit chaque étape N dans son propre fichier `etape_N.txt`, au
+  **même format que le fichier d'entrée** : la taille (`lignes colonnes`) puis la
+  grille (0 / 1 / 2). Un fichier de sortie peut donc être relu comme grille de départ
+  ou comme grille attendue par un test.
 
 > 💡 **C++ : fichiers.** `std::ifstream` lit un fichier (*input*), `std::ofstream`
 > écrit dans un fichier (*output*). `std::ios::app` signifie « ajouter à la fin »
@@ -506,7 +518,7 @@ void nextstep() {
 ```cpp
 Organism o("nom", 50, 50, rules, true);   // 50x50, avec pierres
 o.setTauric(true);                        // AVANT init_...
-o.setOutputFile("resultat.txt");          // AVANT init_...
+o.setOutputDir("resultat_out");           // AVANT init_...
 o.init_organism();
 ```
 
@@ -537,6 +549,37 @@ En mode console, la grille n'est pas dessinée dans le terminal : les étapes so
 
 `"\033[2J\033[H"` est un code spécial qui efface le terminal et remet le curseur
 en haut.
+
+---
+
+### 5.8 Les tests unitaires : `tests_unitaires.cpp`
+
+Un test unitaire vérifie la grille calculée à une itération donnée. Il est paramétré
+par une **grille de départ**, un **nombre d'itérations** et la **grille attendue**.
+
+- `checkGrid(organism, attendue, n)` : calcule `n` itérations puis compare la grille
+  obtenue avec la grille attendue (`true` si identiques). C'est le cœur des tests.
+- `GridTest` : un test écrit dans le code (nom, grille de départ, nombre d'itérations,
+  grille attendue, torique ou non). `run()` construit l'organisme, appelle `checkGrid()`
+  et, en cas d'échec, affiche les grilles attendue et obtenue.
+- `runUnitTests()` : lance les tests intégrés, sur des motifs dont l'évolution est
+  connue (cellule isolée, bloc, clignotant, naissance, planeur, planeur sur grille
+  torique) et renvoie le nombre d'échecs.
+- `testFromFiles(depart, attendu, n, torique)` : même vérification à partir de deux
+  fichiers au format d'entrée, par exemple une grille d'exemple et un fichier `etape_N.txt`.
+
+Les tests forment un **programme séparé** : `tests_unitaires.cpp` inclut lui-même
+`JDLV_taurique.cpp` et possède sa propre `main()`. Il ne dépend pas de SFML et ne
+fait pas partie du programme `jeu_de_la_vie_gui`.
+
+```bash
+g++ -std=c++17 -Wall tests_unitaires.cpp -o tests_unitaires
+./tests_unitaires                              # tests intégrés
+./tests_unitaires depart.txt attendu.txt 4     # depart.txt après 4 itérations = attendu.txt ?
+./tests_unitaires depart.txt attendu.txt 4 --torique
+```
+
+Le programme renvoie 0 si tous les tests réussissent et 1 si un test échoue.
 
 ---
 
@@ -664,7 +707,7 @@ struct Settings {
     bool fromFile = false;        // grille lue depuis un fichier ?
     bool drawGrid = false;        // grille dessinée à la main ?
     std::string inputPath = "exemple.txt";
-    std::string outputPath = "resultat.txt";
+    std::string outputPath = "resultat_out";
     int length = 50, width = 50;
     bool tauric = false;
     bool stones = false;
@@ -680,11 +723,11 @@ et la modifient.
 
 `savePath()` décide où les étapes sont enregistrées :
 
-| Mode | Grille | Fichier de sauvegarde |
+| Mode | Grille | Dossier de sauvegarde |
 |---|---|---|
 | Graphique | n'importe laquelle | aucun (l'historique est en mémoire) |
-| Console | aléatoire ou dessinée | le chemin choisi par l'utilisateur (`resultat.txt` par défaut) |
-| Console | depuis un fichier `X` | `X_out.txt` |
+| Console | aléatoire ou dessinée | le dossier choisi par l'utilisateur (`resultat_out` par défaut) |
+| Console | depuis un fichier `X.txt` | `X_out/`, à côté du fichier d'entrée |
 
 `enum class PageId { Mode, Settings, Draw, Simulation };` donne un nom à chaque
 écran.

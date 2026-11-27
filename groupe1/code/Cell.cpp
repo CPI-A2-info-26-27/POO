@@ -1,5 +1,5 @@
 #include "Cell.h"
-#include "Rules.h"
+#include "Rules.cpp"
 
 Cell::Cell(const CellState* initial) : state(initial), nextState(initial) {}
 

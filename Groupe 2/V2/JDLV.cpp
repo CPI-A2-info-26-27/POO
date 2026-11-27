@@ -3,7 +3,6 @@
 #include <string>
 #include <list>
 #include <cstdlib>
-#include <ctime>
 #include <vector>
 #include <algorithm>
 #include <thread>   // std::this_thread::sleep_for (pause between two steps in the console)

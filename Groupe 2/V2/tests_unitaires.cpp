@@ -8,7 +8,7 @@
 //   g++ -std=c++17 -Wall tests_unitaires.cpp -o tests_unitaires
 //   ./tests_unitaires
 
-#include "JDLV_taurique.cpp" // Organism, Cell, Rules... (game logic)
+#include "JDLV.cpp" // Organism, Cell, Rules... (game logic)
 #include <iostream>
 #include <string>
 #include <vector>
@@ -194,10 +194,7 @@ bool testFromFiles(const std::string& startPath, const std::string& expectedPath
 }
 
 // When this file is compiled alone, it has its own main() that runs the built-in tests.
-// affichage_main.cpp defines JEU_DE_LA_VIE_SANS_MAIN before including it, so this main() is skipped there.
-#ifndef JEU_DE_LA_VIE_SANS_MAIN
 int main()
 {
     return runUnitTests() == 0 ? 0 : 1;
 }
-#endif

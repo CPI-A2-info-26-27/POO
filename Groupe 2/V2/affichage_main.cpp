@@ -13,15 +13,13 @@
 // (Escape leaves full screen). Since the size of the window can change, nothing has a fixed position:
 // every frame, each page places its widgets with layout(width, height).
 //
-// The game logic (Cell, Organism, Rules...) comes from JDLV_taurique.cpp.
-// Its console main() is disabled thanks to JEU_DE_LA_VIE_SANS_MAIN.
+// The game logic (Cell, Organism, Rules...) comes from JDLV.cpp.
 //
 // Install SFML (once):  sudo apt install libsfml-dev
 // Compile:              g++ -std=c++17 -Wall affichage_main.cpp -o jeu_de_la_vie_gui -lsfml-graphics -lsfml-window -lsfml-system
 // Run:                  ./jeu_de_la_vie_gui
 
-#define JEU_DE_LA_VIE_SANS_MAIN
-#include "JDLV_taurique.cpp"
+#include "JDLV.cpp"
 
 #include <SFML/Graphics.hpp>
 #include <algorithm>
@@ -1304,25 +1302,6 @@ void App::run()
 
 // main
 
-const char* USAGE =
-    "Utilisation :\n"
-    "  ./jeu_de_la_vie_gui                                   menu graphique (tous les réglages)\n"
-    "  ./jeu_de_la_vie_gui <fichier> [--torique] [--delai ms]\n"
-    "                                                        mode graphique : la simulation démarre tout de suite\n"
-    "  ./jeu_de_la_vie_gui <fichier> --console <n> [--torique]\n"
-    "                                                        mode console : n itérations écrites dans <fichier>_out/\n";
-
-// Reads a positive integer argument; returns false if it is not one.
-bool readNumber(const std::string& text, int& value)
-{
-    if (text.empty() || text.find_first_not_of("0123456789") != std::string::npos || text.size() > 9)
-    {
-        return false;
-    }
-    value = std::stoi(text);
-    return true;
-}
-
 int main(int argc, char* argv[])
 {
     std::srand(std::time(nullptr));
@@ -1331,58 +1310,7 @@ int main(int argc, char* argv[])
     // ---- File given in parameter: console or graphic mode, no menu ----
     std::string inputFile;
     bool tauric = false;
-    bool console = false;
-    int consoleSteps = 0;
     int delayMs = -1;
-    for (size_t k = 0; k < args.size(); k++)
-    {
-        if (args[k] == "--torique")
-        {
-            tauric = true;
-        }
-        else if (args[k] == "--console" && k + 1 < args.size() && readNumber(args[k + 1], consoleSteps) && consoleSteps > 0)
-        {
-            console = true;
-            k++;
-        }
-        else if (args[k] == "--delai" && k + 1 < args.size() && readNumber(args[k + 1], delayMs))
-        {
-            k++;
-        }
-        else if (inputFile.empty() && args[k].rfind("--", 0) != 0)
-        {
-            inputFile = args[k];
-        }
-        else
-        {
-            std::cerr << "Argument non reconnu : " << args[k] << "\n" << USAGE;
-            return 2;
-        }
-    }
-    if (inputFile.empty() && (console || tauric || delayMs >= 0))
-    {
-        std::cerr << "Il manque le fichier de la grille.\n" << USAGE;
-        return 2;
-    }
-
-    if (console)
-    {
-        // The n first iterations are written in <file>_out/, one file per iteration.
-        ConwayRules rules;
-        Organism organism("console", 0, 0, rules, true);
-        organism.setTauric(tauric);
-        std::string outDir = Settings::outputDirFor(inputFile);
-        organism.setOutputDir(outDir);
-        std::string error;
-        if (!organism.init_from_file(inputFile, error))
-        {
-            std::cerr << error << std::endl;
-            return 1;
-        }
-        runConsoleSimulation(organism, 0, consoleSteps);
-        std::cout << "Toutes les étapes sont dans le dossier : " << outDir << std::endl;
-        return 0;
-    }
 
     App app;
     if (!app.loadFont())

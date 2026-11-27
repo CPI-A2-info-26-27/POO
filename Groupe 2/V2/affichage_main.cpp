@@ -13,15 +13,13 @@
 // (Escape leaves full screen). Since the size of the window can change, nothing has a fixed position:
 // every frame, each page places its widgets with layout(width, height).
 //
-// The game logic (Cell, Organism, Rules...) comes from JDLV_taurique.cpp.
-// Its console main() is disabled thanks to JEU_DE_LA_VIE_SANS_MAIN.
+// The game logic (Cell, Organism, Rules...) comes from JDLV.cpp.
 //
 // Install SFML (once):  sudo apt install libsfml-dev
 // Compile:              g++ -std=c++17 -Wall affichage_main.cpp -o jeu_de_la_vie_gui -lsfml-graphics -lsfml-window -lsfml-system
 // Run:                  ./jeu_de_la_vie_gui
 
-#define JEU_DE_LA_VIE_SANS_MAIN
-#include "JDLV_taurique.cpp"
+#include "JDLV.cpp"
 
 #include <SFML/Graphics.hpp>
 #include <algorithm>
